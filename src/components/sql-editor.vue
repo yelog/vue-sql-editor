@@ -4,7 +4,8 @@
       v-model="text"
       class="sql-editor-textarea"
       style="width: 100%; height: 200px"
-      @keydown.tab="pressTab"
+      @input="changeContent"
+      @keydown="keyDownEvent"
     />
     <pre class="sql-editor-pre"><code class="sql-editor-code" v-html="html" /> </pre>
   </div>
@@ -15,33 +16,61 @@ export default {
   data() {
     return {
       keywords: ['select', 'from', 'where'],
-      text: 'select * from sys_user',
+      // record history
+      log: [],
+      text: '',
       html: ''
     }
   },
-  watch: {
-    text: {
-      handler(newValue) {
-        this.renderContent(newValue)
-      },
-      immediate: true
-    }
-  },
+  // watch: {
+  //   text: {
+  //     handler(newValue) {
+  //       this.renderContent(newValue)
+  //     },
+  //     immediate: true
+  //   }
+  // },
   mounted() {
+    this.text = 'select * from sys_user'
+    this.renderContent(this.text)
+    setInterval(() => {
+      if (this.log[this.log.length - 1] !== this.text) {
+        this.log[this.log.length] = this.text
+      }
+    }, 1500)
   },
   methods: {
+    keyDownEvent(event) {
+      console.log(event)
+      // 禁用 tab 默认行为
+      if (event.keyCode === 9) {
+        event.preventDefault()
+        this.text += '    '
+        this.renderContent(this.text)
+        return false
+      } else if (event.keyCode === 90 && (this.isMac() ? event.metaKey : event.ctrlKey)) {
+        this.log.pop()
+        this.text = this.log[this.log.length - 1]
+        this.renderContent(this.text)
+      }
+
+      // this.renderContent(event.target.value)
+    },
+    isMac() {
+      return /macintosh|mac os x/i.test(navigator.userAgent)
+    },
     changeContent(event) {
       console.log('change')
-      console.log(event.target.innerHTML)
-      console.log(event.data)
-      console.log(event.target.innerText.replaceAll(/\n/g, '\\n'))
+      // console.log(event.target.innerHTML)
+      // console.log(event.data)
+      // console.log(event.target.innerText.replaceAll(/\n/g, '\\n'))
       // console.log(event.target.innerText)
-      const offset = this.getCaretCharacterOffsetWithin()
-      this.renderContent(event.target.innerText)
-      this.$nextTick(() => {
-        this.setCaretPosition(offset, event.inputType === 'insertParagraph')
-        console.log(event.target.innerHTML.replaceAll(/\n/g, '\\n'))
-      })
+      // const offset = this.getCaretCharacterOffsetWithin()
+      this.renderContent(this.text)
+      // this.$nextTick(() => {
+      //   this.setCaretPosition(offset, event.inputType === 'insertParagraph')
+      //   console.log(event.target.innerHTML.replaceAll(/\n/g, '\\n'))
+      // })
     },
     renderContent(text) {
       this.keywords.forEach(item => {
