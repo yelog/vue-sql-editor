@@ -29,6 +29,11 @@ export default {
   watch: {
     text: {
       handler(newValue) {
+        // 如果开始手动写入， 则清空 redo 列表
+        if (!this.redo.isRedo) {
+          this.redo.isRedo = false
+          this.redo.redoList = []
+        }
         this.storeHistory()
         console.log('watch', newValue)
         this.renderContent(newValue)
@@ -42,11 +47,11 @@ export default {
   methods: {
     storeHistory: debounce(function() {
       console.log('store history')
-      if (this.redo.historyList[this.redo.historyList.length - 1] !== this.text) {
-        this.redo.historyList[this.redo.historyList.length] = this.text
-        if (!this.redo.isRedo) {
-          this.redo.isRedo = false
-          this.redo.redoList = []
+      const latestHistory = this.redo.historyList[this.redo.historyList.length - 1]
+      if (latestHistory === undefined || latestHistory.content !== this.text) {
+        this.redo.historyList[this.redo.historyList.length] = {
+          content: this.text
+          // caret: this.getCaretCharacterOffsetWithin()
         }
       }
     }),
@@ -62,17 +67,17 @@ export default {
         event.preventDefault()
         if (event.shiftKey) {
           // 重写  ctrl-shift-z
-          const text = this.redo.redoList.pop()
-          if (text !== undefined) {
+          const history = this.redo.redoList.pop()
+          if (history !== undefined) {
             this.redo.isRedo = true
-            this.text = text
+            this.text = history.content
           }
         } else {
           // 重写 ctrl-z
           this.redo.redoList.push(this.redo.historyList.pop())
-          const text = this.redo.historyList[this.redo.historyList.length - 1]
-          if (text !== undefined) {
-            this.text = text
+          const history = this.redo.historyList[this.redo.historyList.length - 1]
+          if (history !== undefined) {
+            this.text = history.content
           }
         }
       }
