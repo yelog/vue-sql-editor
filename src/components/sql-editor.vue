@@ -1,6 +1,7 @@
 <template>
   <div class="sql-editor">
     <textarea
+      ref="editTextarea"
       v-model="text"
       class="sql-editor-textarea"
       style="width: 100%; height: 200px"
@@ -30,8 +31,9 @@ export default {
     text: {
       handler(newValue) {
         // 如果开始手动写入， 则清空 redo 列表
-        if (!this.redo.isRedo) {
+        if (this.redo.isRedo) {
           this.redo.isRedo = false
+        } else {
           this.redo.redoList = []
         }
         this.storeHistory()
@@ -46,12 +48,12 @@ export default {
   },
   methods: {
     storeHistory: debounce(function() {
-      console.log('store history')
       const latestHistory = this.redo.historyList[this.redo.historyList.length - 1]
       if (latestHistory === undefined || latestHistory.content !== this.text) {
+        console.log('store history')
         this.redo.historyList[this.redo.historyList.length] = {
-          content: this.text
-          // caret: this.getCaretCharacterOffsetWithin()
+          content: this.text,
+          caret: this.getCaretPos()
         }
       }
     }),
@@ -65,24 +67,39 @@ export default {
         return false
       } else if (event.keyCode === 90 && (this.isMac() ? event.metaKey : event.ctrlKey)) {
         event.preventDefault()
+        let history
         if (event.shiftKey) {
           // 重写  ctrl-shift-z
-          const history = this.redo.redoList.pop()
-          if (history !== undefined) {
-            this.redo.isRedo = true
-            this.text = history.content
-          }
+          history = this.redo.redoList.pop()
         } else {
           // 重写 ctrl-z
           this.redo.redoList.push(this.redo.historyList.pop())
-          const history = this.redo.historyList[this.redo.historyList.length - 1]
-          if (history !== undefined) {
-            this.text = history.content
-          }
+          history = this.redo.historyList[this.redo.historyList.length - 1]
+        }
+        if (history !== undefined) {
+          // 标识当前 text 修改来自于撤销或重做
+          this.redo.isRedo = true
+          this.text = history.content
+          this.$nextTick(() => {
+            this.setCaretPos(history.caret)
+          })
         }
       }
-
-      // this.renderContent(event.target.value)
+    },
+    getCaretPos() {
+      const editTextarea = this.$refs.editTextarea
+      let caretPos = 0
+      if (editTextarea.selectionStart || editTextarea.selectionStart === 0) {
+        caretPos = editTextarea.selectionStart // 获取选定区的开始点
+      }
+      return caretPos
+    },
+    setCaretPos(caretPos) {
+      const editTextarea = this.$refs.editTextarea
+      if (editTextarea.setSelectionRange) {
+        editTextarea.focus()
+        editTextarea.setSelectionRange(caretPos, caretPos)
+      }
     },
     isMac() {
       return /macintosh|mac os x/i.test(navigator.userAgent)
