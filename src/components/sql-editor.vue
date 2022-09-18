@@ -4,44 +4,54 @@
       v-model="text"
       class="sql-editor-textarea"
       style="width: 100%; height: 200px"
-      @input="changeContent"
       @keydown="keyDownEvent"
     />
     <pre class="sql-editor-pre"><code class="sql-editor-code" v-html="html" /> </pre>
   </div>
 </template>
 <script>
+import { debounce } from '@/utils/common'
+
 export default {
   name: 'SqlEditor',
   data() {
     return {
-      keywords: ['select', 'from', 'where'],
-      // record history
-      log: [],
+      keywords: ['select', 'from', 'where', 'order by', 'desc', 'asc'],
+      redo: {
+        historyList: [],
+        redoList: [],
+        isRedo: false
+      },
       text: '',
       html: ''
     }
   },
-  // watch: {
-  //   text: {
-  //     handler(newValue) {
-  //       this.renderContent(newValue)
-  //     },
-  //     immediate: true
-  //   }
-  // },
+  watch: {
+    text: {
+      handler(newValue) {
+        this.storeHistory()
+        console.log('watch', newValue)
+        this.renderContent(newValue)
+      },
+      immediate: true
+    }
+  },
   mounted() {
     this.text = 'select * from sys_user'
-    this.renderContent(this.text)
-    setInterval(() => {
-      if (this.log[this.log.length - 1] !== this.text) {
-        this.log[this.log.length] = this.text
-      }
-    }, 1500)
   },
   methods: {
+    storeHistory: debounce(function() {
+      console.log('store history')
+      if (this.redo.historyList[this.redo.historyList.length - 1] !== this.text) {
+        this.redo.historyList[this.redo.historyList.length] = this.text
+        if (!this.redo.isRedo) {
+          this.redo.isRedo = false
+          this.redo.redoList = []
+        }
+      }
+    }),
     keyDownEvent(event) {
-      console.log(event)
+      // console.log(event)
       // 禁用 tab 默认行为
       if (event.keyCode === 9) {
         event.preventDefault()
@@ -49,9 +59,22 @@ export default {
         this.renderContent(this.text)
         return false
       } else if (event.keyCode === 90 && (this.isMac() ? event.metaKey : event.ctrlKey)) {
-        this.log.pop()
-        this.text = this.log[this.log.length - 1]
-        this.renderContent(this.text)
+        event.preventDefault()
+        if (event.shiftKey) {
+          // 重写  ctrl-shift-z
+          const text = this.redo.redoList.pop()
+          if (text !== undefined) {
+            this.redo.isRedo = true
+            this.text = text
+          }
+        } else {
+          // 重写 ctrl-z
+          this.redo.redoList.push(this.redo.historyList.pop())
+          const text = this.redo.historyList[this.redo.historyList.length - 1]
+          if (text !== undefined) {
+            this.text = text
+          }
+        }
       }
 
       // this.renderContent(event.target.value)
@@ -60,7 +83,7 @@ export default {
       return /macintosh|mac os x/i.test(navigator.userAgent)
     },
     changeContent(event) {
-      console.log('change')
+      // console.log('change')
       // console.log(event.target.innerHTML)
       // console.log(event.data)
       // console.log(event.target.innerText.replaceAll(/\n/g, '\\n'))
