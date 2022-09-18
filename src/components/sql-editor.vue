@@ -47,6 +47,15 @@ export default {
     this.text = 'select * from sys_user'
   },
   methods: {
+    renderContent(text) {
+      // sql 关键字
+      this.keywords.forEach(item => {
+        text = text.replaceAll(new RegExp(`(${item})`, 'gi'), `<span class="keyword">$1</span>`)
+      })
+      // 注释
+      text = text.replaceAll(/(--[\s\S]*?)(?=$|\n)/g, `<span class="comment">$1</span>`)
+      this.html = text
+    },
     storeHistory: debounce(function() {
       const latestHistory = this.redo.historyList[this.redo.historyList.length - 1]
       if (latestHistory === undefined || latestHistory.content !== this.text) {
@@ -103,154 +112,7 @@ export default {
     },
     isMac() {
       return /macintosh|mac os x/i.test(navigator.userAgent)
-    },
-    changeContent(event) {
-      // console.log('change')
-      // console.log(event.target.innerHTML)
-      // console.log(event.data)
-      // console.log(event.target.innerText.replaceAll(/\n/g, '\\n'))
-      // console.log(event.target.innerText)
-      // const offset = this.getCaretCharacterOffsetWithin()
-      this.renderContent(this.text)
-      // this.$nextTick(() => {
-      //   this.setCaretPosition(offset, event.inputType === 'insertParagraph')
-      //   console.log(event.target.innerHTML.replaceAll(/\n/g, '\\n'))
-      // })
-    },
-    renderContent(text) {
-      this.keywords.forEach(item => {
-        text = text.replaceAll(new RegExp(`(${item})`, 'gi'), `<span class="keyword">$1</span>`)
-      })
-      this.html = text
-    },
-    getCaretCharacterOffsetWithin() {
-      const element = this.$refs.content
-      let caretOffset = 0
-      const doc = element.ownerDocument || element.document
-      const win = doc.defaultView || doc.parentWindow
-      let sel
-      if (typeof win.getSelection !== 'undefined') {
-        sel = win.getSelection()
-        if (sel.rangeCount > 0) {
-          const range = win.getSelection().getRangeAt(0)
-          const preCaretRange = range.cloneRange()
-          preCaretRange.selectNodeContents(element)
-          preCaretRange.setEnd(range.endContainer, range.endOffset)
-          caretOffset = preCaretRange.toString().length
-        }
-      } else if ((sel = doc.selection) && sel.type !== 'Control') {
-        const textRange = sel.createRange()
-        const preCaretTextRange = doc.body.createTextRange()
-        preCaretTextRange.moveToElementText(element)
-        preCaretTextRange.setEndPoint('EndToEnd', textRange)
-        caretOffset = preCaretTextRange.text.length
-      }
-      return caretOffset
-    },
-    setCaretPosition(offset, isEnter) {
-      const element = this.$refs.content
-      const range = document.createRange()
-      const sel = window.getSelection()
-
-      // select appropriate node
-      let currentNode = null
-      let previousNode = null
-      let nextStop = false
-
-      for (let i = 0; i < element.childNodes.length; i++) {
-        // save previous node
-        previousNode = currentNode
-
-        // get current node
-        currentNode = element.childNodes[i]
-        // if we get span or something else then we should get child node
-        while (currentNode.childNodes.length > 0) {
-          [currentNode] = currentNode.childNodes
-        }
-        if (nextStop) {
-          break
-        }
-
-        // calc offset in current node
-        if (previousNode != null) {
-          offset -= previousNode.length
-        }
-        // check whether current node has enough length
-        if (offset <= currentNode.length) {
-          if (isEnter) {
-            if (element.childNodes[i].nodeName === '#text') {
-              // 如果是结尾，则移动到最后
-              offset += currentNode.length - offset === 2 ? 2 : 1
-              break
-            } else {
-              nextStop = true
-              offset = 1
-            }
-          } else {
-            break
-          }
-        }
-      }
-      // move caret to specified offset
-      if (currentNode != null) {
-        range.setStart(currentNode, offset)
-        range.collapse(true)
-        sel.removeAllRanges()
-        sel.addRange(range)
-      }
-    },
-    pressTab(event) {
-      // 阻止默认切换元素的行为
-      if (event && event.preventDefault) {
-        event.preventDefault()
-      } else {
-        window.event.returnValue = false
-      }
-      //
-      // var newCaretPosition;
-      // newCaretPosition = textarea.getCaretPosition() + "    ".length;
-      // textarea.value = textarea.value.substring(0, textarea.getCaretPosition()) + "    " + textarea.value.substring(textarea.getCaretPosition(), textarea.value.length);
-      // textarea.setCaretPosition(newCaretPosition);
-    },
-    pressEnter(event) {
-      // 阻止默认切换元素的行为
-      // if (event && event.preventDefault) {
-      //   event.preventDefault()
-      // } else {
-      //   window.event.returnValue = false
-      // }
-      // this.insertHtmlAtCaret('\n')
-      // this.changeContent(event)
     }
-    // insertHtmlAtCaret(html) {
-    //   var sel, range, frag
-    //   if (window.getSelection) {
-    //     sel = window.getSelection()
-    //     if (sel.getRangeAt && sel.rangeCount) {
-    //       range = sel.getRangeAt(0)
-    //       range.deleteContents()
-    //       var el = document.createElement('div')
-    //       el.innerHTML = html
-    //       frag = document.createDocumentFragment()
-    //       var node
-    //       var lastNode
-    //       while ((node = el.firstChild)) {
-    //         lastNode = frag.appendChild(node)
-    //       }
-    //       range.insertNode(frag)
-    //       if (lastNode) {
-    //         range = range.cloneRange()
-    //         range.setStartAfter(lastNode)
-    //         range.collapse(true)
-    //         sel.removeAllRanges()
-    //         sel.addRange(range)
-    //       }
-    //     } else {
-    //       var el = this.$refs.content
-    //       el.innerHTML = html
-    //     }
-    //   }
-    // }
   }
 }
 </script>
@@ -281,7 +143,7 @@ export default {
     border: none;
     resize: none;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-    caret-color: #111;
+    caret-color: #2795EE;
     color: transparent;
     background: transparent;
   }
@@ -292,14 +154,19 @@ export default {
   }
   &-code {
     display: block;
-    color: #A9B7C6;
+    color: #2795EE;
     width: 100%;
     height: 100%;
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
     overflow: hidden;
 
-    /deep/ .keyword {
-      color: #CC7832;
+    /deep/{
+      .keyword {
+        color: #A151D2;
+      }
+      .comment {
+        color: #a0a1a7;
+      }
     }
   }
 
