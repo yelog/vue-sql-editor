@@ -16,10 +16,16 @@ export default {
   name: 'SqlEditor',
   data() {
     return {
-      keywords: ['select', 'from',
-        'where', 'like', 'and',
-        'group', 'on',
+      // 前后不能有其它字符
+      keywords: ['create', 'drop', 'alter', 'table', 'column', 'use', 'database',
+        'int', 'integer', 'varchar',
+        'select', 'delete', 'update', 'set', 'insert', 'into', 'values',
+        'min', 'max', 'as', 'from',
+        'where', 'like', 'between', 'and', 'in', 'not', 'is', 'null',
+        'group', 'on', 'having',
         'order', 'by', 'desc', 'asc'],
+      // 前后可以有其它字符
+      operator: [',', '=', '!=', '\\(', '\\)', '<', '>', ';'],
       redo: {
         historyList: [],
         redoList: [],
@@ -50,10 +56,7 @@ export default {
   },
   methods: {
     renderContent(text) {
-      // 拆分 <>， 防止被页面解析
-      text = text.replaceAll(/([<>])/g, `<span class="symbol">$1</span>`)
-
-      // 替换 ''
+      // 替换 '' 字符串
       const placeholderList = []
       const reg = /('[\s\S]*?')/ig
       let result = ''
@@ -66,11 +69,15 @@ export default {
       for (let i = 0; i < placeholderList.length; i++) {
         text = text.replace(placeholderList[i].content, ' ')
       }
-      // 引号使用强制颜色， 如果有问题按照上面的拆分
-      // text = text.replaceAll(reg, `<span class="quote">$1</span>`)
+      // 拆分 <>， 防止被页面解析, 和渲染操作符合并， 防止渲染出现的 = 被操作符识别
+      // text = text.replaceAll(/([<>])/g, `<span class="symbol">$1</span>`)
+      // 渲染操作符
+      text = text.replaceAll(new RegExp('(' + this.operator.join('|') + ')', 'gi'), `<span class="operate">$1</span>`)
+      // 渲染数字
+      text = text.replaceAll(/(?<=^|\W)(\d+?)(?=$|\W)/g, `<span class="number">$1</span>`)
       // sql 关键字
       this.keywords.forEach(item => {
-        text = text.replaceAll(new RegExp(`(?<=^|\\s|\\W)(${item})(?=$|\\s|\\W)`, 'gi'), `<span class="keyword">$1</span>`)
+        text = text.replaceAll(new RegExp(`(?<=^|\\W)(${item})(?=$|\\W)`, 'gi'), `<span class="keyword">$1</span>`)
       })
       // 注释
       text = text.replaceAll(/(--[\s\S]*?)(?=$|\n)/g, `<span class="comment">$1</span>`)
@@ -100,11 +107,9 @@ export default {
         const queryResult = placeholderList.filter(placeholder => (placeholder.index + 1) === originIndex)
         if (queryResult.length > 0) {
           originIndex += queryResult[0].content.length - 1
-          breaks[i] = `<span class="quote">${queryResult[0].content}</span>`
+          breaks[i] = `<span class="string">${queryResult[0].content}</span>`
         }
       }
-      console.log('origin', originIndex)
-      console.log('origin - text', this.text.length)
       this.html = breaks.join('')
     },
     storeHistory: debounce(function() {
@@ -170,13 +175,14 @@ export default {
 .sql-editor {
   position: relative;
   font-size: 20px;
-  line-height: 1;
+  line-height: 1.1;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  width: 100%;
+  height: inherit;
 
   &-pre, &-textarea {
     width: 100%;
-    //height: 100%;
-    height: 200px;
+    height: 100%;
     padding: 10px;
     margin: 0;
     top: 0;
@@ -217,11 +223,17 @@ export default {
       .keyword {
         color: #A151D2;
       }
+      .operate {
+        color: #795548;
+      }
       .comment {
         color: #a0a1a7;
       }
-      .quote {
-        color: #249d7f!important;
+      .string {
+        color: #249d7f;
+      }
+      .number {
+        color: #ff8645;
       }
       .error {
 
