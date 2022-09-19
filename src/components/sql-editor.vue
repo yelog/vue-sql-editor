@@ -4,7 +4,6 @@
       ref="editTextarea"
       v-model="text"
       class="sql-editor-textarea"
-      style="width: 100%; height: 200px"
       @keydown="keyDownEvent"
     />
     <pre class="sql-editor-pre"><code class="sql-editor-code" v-html="html" /> </pre>
@@ -17,7 +16,10 @@ export default {
   name: 'SqlEditor',
   data() {
     return {
-      keywords: ['select', 'from', 'where', 'order by', 'desc', 'asc'],
+      keywords: ['select', 'from',
+        'where', 'like', 'and',
+        'group', 'on',
+        'order', 'by', 'desc', 'asc'],
       redo: {
         historyList: [],
         redoList: [],
@@ -37,7 +39,7 @@ export default {
           this.redo.redoList = []
         }
         this.storeHistory()
-        console.log('watch', newValue)
+        // console.log('watch', newValue)
         this.renderContent(newValue)
       },
       immediate: true
@@ -48,18 +50,66 @@ export default {
   },
   methods: {
     renderContent(text) {
+      // 拆分 <>， 防止被页面解析
+      text = text.replaceAll(/([<>])/g, `<span class="symbol">$1</span>`)
+
+      // 替换 ''
+      const placeholderList = []
+      const reg = /('[\s\S]*?')/ig
+      let result = ''
+      while ((result = reg.exec(text)) !== null) {
+        placeholderList.push({
+          index: result.index,
+          content: result[0]
+        })
+      }
+      for (let i = 0; i < placeholderList.length; i++) {
+        text = text.replace(placeholderList[i].content, ' ')
+      }
+      // 引号使用强制颜色， 如果有问题按照上面的拆分
+      // text = text.replaceAll(reg, `<span class="quote">$1</span>`)
       // sql 关键字
       this.keywords.forEach(item => {
-        text = text.replaceAll(new RegExp(`(${item})`, 'gi'), `<span class="keyword">$1</span>`)
+        text = text.replaceAll(new RegExp(`(?<=^|\\s|\\W)(${item})(?=$|\\s|\\W)`, 'gi'), `<span class="keyword">$1</span>`)
       })
       // 注释
       text = text.replaceAll(/(--[\s\S]*?)(?=$|\n)/g, `<span class="comment">$1</span>`)
-      this.html = text
+
+      // 还原替换符
+      const breaks = text.split('')
+      const tagStack = []
+      const tag = []
+      let originIndex = 0
+      for (let i = 0; i < breaks.length; i++) {
+        if (breaks[i] === '<' || tag.length > 0) {
+          tag.push(breaks[i])
+        }
+        if (breaks[i] === '>') {
+          if (tag[1] === '/') {
+            // close tag
+            tagStack.pop()
+          } else {
+            // start tag
+            tagStack.push(tag.join(''))
+          }
+          tag.length = 0
+        }
+        if (!(breaks[i] === '<' || tag.length > 0 || breaks[i] === '>')) {
+          originIndex++
+        }
+        const queryResult = placeholderList.filter(placeholder => (placeholder.index + 1) === originIndex)
+        if (queryResult.length > 0) {
+          originIndex += queryResult[0].content.length - 1
+          breaks[i] = `<span class="quote">${queryResult[0].content}</span>`
+        }
+      }
+      console.log('origin', originIndex)
+      console.log('origin - text', this.text.length)
+      this.html = breaks.join('')
     },
     storeHistory: debounce(function() {
       const latestHistory = this.redo.historyList[this.redo.historyList.length - 1]
       if (latestHistory === undefined || latestHistory.content !== this.text) {
-        console.log('store history')
         this.redo.historyList[this.redo.historyList.length] = {
           content: this.text,
           caret: this.getCaretPos()
@@ -119,6 +169,9 @@ export default {
 <style scoped lang="scss">
 .sql-editor {
   position: relative;
+  font-size: 20px;
+  line-height: 1;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
 
   &-pre, &-textarea {
     width: 100%;
@@ -128,13 +181,14 @@ export default {
     margin: 0;
     top: 0;
     left: 0;
-    font-size: 13px;
-    line-height: 20px;
+    font-size: inherit;
+    line-height: inherit;
     position: absolute;
     overflow: auto;
     outline: none;
     box-sizing: border-box;
     border: none;
+    font-family: inherit;
   }
 
   &-textarea {
@@ -142,7 +196,6 @@ export default {
     background: none;
     border: none;
     resize: none;
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
     caret-color: #2795EE;
     color: transparent;
     background: transparent;
@@ -157,7 +210,7 @@ export default {
     color: #2795EE;
     width: 100%;
     height: 100%;
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-family: inherit;
     overflow: hidden;
 
     /deep/{
@@ -166,6 +219,15 @@ export default {
       }
       .comment {
         color: #a0a1a7;
+      }
+      .quote {
+        color: #249d7f!important;
+      }
+      .error {
+
+      }
+      .symbol {
+        color: #778899;
       }
     }
   }
