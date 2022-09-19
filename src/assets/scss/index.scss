@@ -1,0 +1,30 @@
+body {
+  .hint-area {
+    min-width: 200px;
+    max-height: 400px;
+    font-size: 15px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    line-height: 1.1;
+    background: white;
+    color: #2795EE;
+    overflow-y: auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    .hint-area-item {
+      padding: 3px;
+      &-icon {
+        display: inline-block;
+        width: 15px;
+      }
+     &.selected {
+       background: #E0E0E0
+     }
+    }
+    .matchKey {
+      color: #f06292;
+    }
+  }
+}

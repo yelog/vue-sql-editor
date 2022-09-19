@@ -4,13 +4,18 @@
       ref="editTextarea"
       v-model="text"
       class="sql-editor-textarea"
-      @keydown="keyDownEvent"
+      @input="inputEvent"
+      @blur="blurEvent"
+      @keydown="keydownEvent"
+      @click="clickEvent"
+      @keyup="keyupEvent"
     />
     <pre class="sql-editor-pre"><code class="sql-editor-code" v-html="html" /> </pre>
   </div>
 </template>
 <script>
 import { debounce } from '@/utils/common'
+import { getCursorPos } from '@/utils/getCursorPos'
 
 export default {
   name: 'SqlEditor',
@@ -31,6 +36,14 @@ export default {
         redoList: [],
         isRedo: false
       },
+      hint: {
+        hintAreaDom: null,
+        caretPos: 0,
+        curWord: '',
+        selectedDom: '',
+        itemDomList: []
+      },
+      isInput: false,
       text: '',
       html: ''
     }
@@ -38,8 +51,8 @@ export default {
   watch: {
     text: {
       handler(newValue) {
-        // 如果开始手动写入， 则清空 redo 列表
         if (this.redo.isRedo) {
+          // 撤销/重做操作
           this.redo.isRedo = false
         } else {
           this.redo.redoList = []
@@ -55,6 +68,67 @@ export default {
     this.text = 'select * from sys_user'
   },
   methods: {
+    showHints() {
+      const innerHtml = []
+      // 获取当前字符串
+      const curWordArray = []
+      for (let i = this.getCaretPos() - 1; i >= 0; i--) {
+        const curChar = this.text[i]
+        if (!/\w/g.test(curChar)) {
+          break
+        }
+        curWordArray.push(curChar)
+      }
+      this.hint.curWord = curWordArray.reverse().join('')
+      const matchList = this.hint.curWord === '' ? [] : this.keywords
+        .filter(keyword => keyword.indexOf(this.hint.curWord) >= 0)
+      if (matchList.length === 0 || (matchList.length === 1 && matchList[0] === this.hint.curWord)) {
+        this.closeHints()
+        return
+      }
+      // 开始展示
+      this.hint.caretPos = this.getCaretPos()
+      this.hint.hintAreaDom = document.getElementById('hint-area')
+      if (!this.hint.hintAreaDom) {
+        this.hint.hintAreaDom = document.createElement('div')
+        this.hint.hintAreaDom.id = 'hint-area'
+        this.hint.hintAreaDom.className = 'hint-area'
+        document.body.appendChild(this.hint.hintAreaDom)
+      }
+      // 设置位置信息
+      const pos = getCursorPos.getInputPositon(this.$refs.editTextarea, this.getCaretPos() - curWordArray.length)
+      console.log(pos)
+      this.hint.hintAreaDom.style.top = (pos.top + 20) + 'px'
+      this.hint.hintAreaDom.style.left = (pos.left - 18) + 'px'
+      // 设置列表
+      innerHtml.push(...matchList.sort((key1, key2) => key1.indexOf(this.hint.curWord) - key2.indexOf(this.hint.curWord))
+        .map((keyword, index) => `<div class="hint-area-item ${index === 0 ? 'selected' : ''}"><div class="hint-area-item-icon"></div>${keyword.replace(this.hint.curWord, `<span class="matchKey">${this.hint.curWord}</span>`)}</div>`))
+      this.hint.hintAreaDom.innerHTML = innerHtml.join('')
+      // 记录到变量中
+      this.hint.selectedDom = this.hint.hintAreaDom.querySelector('.selected')
+      this.hint.itemDomList = this.hint.hintAreaDom.querySelectorAll('.hint-area-item')
+      this.hint.itemDomList.forEach(el => {
+        // 鼠标移动高亮
+        el.addEventListener('mouseenter', (event) => {
+          // console.log(hintAreaDom.querySelector('.selected'))
+          this.hint.hintAreaDom.querySelector('.selected').classList.remove('selected')
+          event.target.classList.add('selected')
+          this.hint.selectedDom = event.target
+        })
+        // 鼠标点击选中
+        el.addEventListener('click', (event) => {
+          this.addText(event.target.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
+          this.closeHints()
+        })
+      })
+    },
+    closeHints() {
+      const hintAreaDom = this.hint.hintAreaDom || document.getElementById('hint-area')
+      if (hintAreaDom) {
+        hintAreaDom.remove()
+      }
+      this.hint.hintAreaDom = null
+    },
     renderContent(text) {
       // 替换 '' 字符串
       const placeholderList = []
@@ -121,49 +195,110 @@ export default {
         }
       }
     }),
-    keyDownEvent(event) {
+    inputEvent(event) {
+      if (/\w/g.test(event.data)) {
+        this.$nextTick(() => {
+          this.showHints()
+        })
+      }
+    },
+    blurEvent() {
+      this.closeHints()
+    },
+    keydownEvent(event) {
       // console.log(event)
-      // 禁用 tab 默认行为
-      if (event.keyCode === 9) {
-        event.preventDefault()
-        this.text += '    '
-        this.renderContent(this.text)
-        return false
-      } else if (event.keyCode === 90 && (this.isMac() ? event.metaKey : event.ctrlKey)) {
-        event.preventDefault()
-        let history
-        if (event.shiftKey) {
-          // 重写  ctrl-shift-z
-          history = this.redo.redoList.pop()
-        } else {
-          // 重写 ctrl-z
-          this.redo.redoList.push(this.redo.historyList.pop())
-          history = this.redo.historyList[this.redo.historyList.length - 1]
+      if (this.hint.hintAreaDom) {
+        // 有提示框
+        if (event.keyCode === 13) {
+          // 回车
+          event.preventDefault()
+          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
+          this.closeHints()
         }
-        if (history !== undefined) {
-          // 标识当前 text 修改来自于撤销或重做
-          this.redo.isRedo = true
-          this.text = history.content
-          this.$nextTick(() => {
+        if (event.keyCode === 9) {
+          event.preventDefault()
+          this.addText('    ')
+          this.closeHints()
+        }
+        if (event.keyCode === 40 || event.keyCode === 38) {
+          // 下 上 tab
+          event.preventDefault()
+          // console.log(this.hint.itemDomList.indexOf(this.hint.selectedDom))
+          let nextIndex = [].indexOf.call(this.hint.itemDomList, this.hint.selectedDom) +
+              (event.keyCode === 40 ? 1 : -1)
+          if (nextIndex >= this.hint.itemDomList.length) {
+            nextIndex = 0
+          } else if (nextIndex < 0) {
+            nextIndex = this.hint.itemDomList.length - 1
+          }
+          this.hint.selectedDom.classList.remove('selected')
+          this.hint.itemDomList[nextIndex].classList.add('selected')
+          this.hint.selectedDom = this.hint.itemDomList[nextIndex]
+        }
+      } else {
+        if (event.keyCode === 9) {
+          // 禁用 tab 默认行为
+          event.preventDefault()
+          this.addText('    ')
+          return false
+        } else if (event.keyCode === 90 && (this.isMac() ? event.metaKey : event.ctrlKey)) {
+          event.preventDefault()
+          let history
+          if (event.shiftKey) {
+            // 重写  ctrl-shift-z
+            history = this.redo.redoList.pop()
+          } else {
+            // 重写 ctrl-z
+            this.redo.redoList.push(this.redo.historyList.pop())
+            history = this.redo.historyList[this.redo.historyList.length - 1]
+          }
+          if (history !== undefined) {
+            // 标识当前 text 修改来自撤销或重做
+            this.redo.isRedo = true
+            this.text = history.content
             this.setCaretPos(history.caret)
-          })
+          }
         }
       }
+    },
+    keyupEvent(event) {
+      if (this.hint.hintAreaDom) {
+        // 左右键
+        if (event.keyCode === 37 || event.keyCode === 39) {
+          if (this.hint.caretPos !== this.getCaretPos()) {
+            this.closeHints()
+          }
+        }
+      }
+    },
+    clickEvent(event) {
+      if (this.hint.hintAreaDom) {
+        if (this.hint.caretPos !== this.getCaretPos()) {
+          this.closeHints()
+        }
+      }
+    },
+    addText(addText, caretPos = this.getCaretPos(), delCount = 0) {
+      const text = this.text
+      this.text = text.slice(0, caretPos) + addText + text.slice(caretPos + Math.abs(delCount))
+      this.setCaretPos(caretPos + addText.length)
     },
     getCaretPos() {
       const editTextarea = this.$refs.editTextarea
-      let caretPos = 0
-      if (editTextarea.selectionStart || editTextarea.selectionStart === 0) {
-        caretPos = editTextarea.selectionStart // 获取选定区的开始点
+      if (editTextarea && (editTextarea.selectionStart || editTextarea.selectionStart === 0)) {
+        return editTextarea.selectionStart // 获取选定区的开始点
+      } else {
+        return undefined
       }
-      return caretPos
     },
     setCaretPos(caretPos) {
-      const editTextarea = this.$refs.editTextarea
-      if (editTextarea.setSelectionRange) {
-        editTextarea.focus()
-        editTextarea.setSelectionRange(caretPos, caretPos)
-      }
+      this.$nextTick(() => {
+        const editTextarea = this.$refs.editTextarea
+        if (editTextarea.setSelectionRange) {
+          editTextarea.focus()
+          editTextarea.setSelectionRange(caretPos, caretPos)
+        }
+      })
     },
     isMac() {
       return /macintosh|mac os x/i.test(navigator.userAgent)
@@ -174,7 +309,7 @@ export default {
 <style scoped lang="scss">
 .sql-editor {
   position: relative;
-  font-size: 20px;
+  font-size: 15px;
   line-height: 1.1;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
   width: 100%;
@@ -243,7 +378,5 @@ export default {
       }
     }
   }
-
 }
-
 </style>
