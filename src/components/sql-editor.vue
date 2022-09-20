@@ -86,7 +86,7 @@ export default {
     this.text = 'select\n    username, password, sys_user.type as user_type\nfrom\n    sys_user user\n    left join sys_role role on user.role_id = role.id\nwhere username=\'yang\'\n    and sys_user.type in (\'web\')\n    and age between 18 and 30 and role.id < 5'
   },
   methods: {
-    generateMatchList(list) {
+    generateMatchList(list, icon = '') {
       return list
         .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item)).map((item) => {
           // 所有第一个匹配的char
@@ -104,7 +104,8 @@ export default {
           }
           return {
             content: item,
-            matchIndexList: matchIndexList
+            matchIndexList: matchIndexList,
+            icon: icon
           }
         })
     },
@@ -123,9 +124,9 @@ export default {
       this.hint.curWord = curWordArray.reverse().join('')
       const matchList = []
       if (this.hint.curWord !== '') {
-        matchList.push(...this.generateMatchList(this.keywords))
+        matchList.push(...this.generateMatchList(this.keywords, 'icon-sql'))
         // 匹配表名
-        matchList.push(...this.generateMatchList(this.tableNames))
+        matchList.push(...this.generateMatchList(this.tableNames, 'icon-table'))
         // matchList.push(...this.tableNames
         //   .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item)))
       }
@@ -146,7 +147,7 @@ export default {
       const pos = getCursorPos.getInputPositon(this.$refs.editTextarea, this.getCaretPos() - curWordArray.length)
       // console.log(pos)
       this.hint.hintAreaDom.style.top = (pos.top + 20) + 'px'
-      this.hint.hintAreaDom.style.left = (pos.left - 18) + 'px'
+      this.hint.hintAreaDom.style.left = (pos.left - 23) + 'px'
       // 设置列表
       innerHtml.push(...matchList
       // 排序， 索引数和最小的最靠上
@@ -156,7 +157,7 @@ export default {
           for (let i = 0; i < item.matchIndexList.length; i++) {
             itemArray[item.matchIndexList[i]] = `<span class="matchKey">${itemArray[item.matchIndexList[i]]}</span>`
           }
-          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}"><div class="hint-area-item-icon"></div>${itemArray.join('')}</div>`
+          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}"><div class="hint-area-item-icon iconfont ${item.icon}"></div>${itemArray.join('')}</div>`
         }))
       this.hint.hintAreaDom.innerHTML = innerHtml.join('')
       // 记录到变量中

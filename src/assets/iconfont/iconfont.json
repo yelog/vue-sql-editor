@@ -1,0 +1,30 @@
+{
+  "id": "3660937",
+  "name": "sql-editor",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "401158",
+      "name": "table2",
+      "font_class": "table",
+      "unicode": "e87e",
+      "unicode_decimal": 59518
+    },
+    {
+      "icon_id": "586903",
+      "name": "freeze-column",
+      "font_class": "freezecolumn",
+      "unicode": "e738",
+      "unicode_decimal": 59192
+    },
+    {
+      "icon_id": "17822204",
+      "name": "SQL",
+      "font_class": "sql",
+      "unicode": "e6c3",
+      "unicode_decimal": 59075
+    }
+  ]
+}
