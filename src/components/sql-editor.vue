@@ -77,6 +77,28 @@ export default {
     this.text = 'select * from sys_user'
   },
   methods: {
+    generateMatchList(list) {
+      return list
+        .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item)).map((item) => {
+          // 所有第一个匹配的char
+          const matchIndexList = []
+          const itemArray = item.split('')
+          let lastIndex = 0
+          for (let i = 0; i < this.hint.curWord.length; i++) {
+            for (let j = lastIndex; j < itemArray.length; j++) {
+              if (itemArray[j] === this.hint.curWord[i]) {
+                matchIndexList.push(j)
+                lastIndex = j + 1
+                break
+              }
+            }
+          }
+          return {
+            content: item,
+            matchIndexList: matchIndexList
+          }
+        })
+    },
     showHints() {
       const innerHtml = []
       // 获取当前字符串
@@ -89,9 +111,15 @@ export default {
         curWordArray.push(curChar)
       }
       this.hint.curWord = curWordArray.reverse().join('')
-      const matchList = this.hint.curWord === '' ? [] : this.keywords
-        .filter(keyword => keyword.indexOf(this.hint.curWord) >= 0)
-      if (matchList.length === 0 || (matchList.length === 1 && matchList[0] === this.hint.curWord)) {
+      const matchList = []
+      if (this.hint.curWord !== '') {
+        matchList.push(...this.generateMatchList(this.keywords))
+        // 匹配表名
+        matchList.push(...this.generateMatchList(this.tableNames))
+        // matchList.push(...this.tableNames
+        //   .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item)))
+      }
+      if (matchList.length === 0 || (matchList.length === 1 && matchList[0].content === this.hint.curWord)) {
         this.closeHints()
         return
       }
@@ -110,8 +138,16 @@ export default {
       this.hint.hintAreaDom.style.top = (pos.top + 20) + 'px'
       this.hint.hintAreaDom.style.left = (pos.left - 18) + 'px'
       // 设置列表
-      innerHtml.push(...matchList.sort((key1, key2) => key1.indexOf(this.hint.curWord) - key2.indexOf(this.hint.curWord))
-        .map((keyword, index) => `<div class="hint-area-item ${index === 0 ? 'selected' : ''}"><div class="hint-area-item-icon"></div>${keyword.replace(this.hint.curWord, `<span class="matchKey">${this.hint.curWord}</span>`)}</div>`))
+      innerHtml.push(...matchList
+      // 排序， 索引数和最小的最靠上
+        .sort((item1, item2) => item1.matchIndexList.reduce((prev, cur) => prev + cur, 0) - item2.matchIndexList.reduce((prev, cur) => prev + cur, 0))
+        .map((item, index) => {
+          const itemArray = item.content.split('')
+          for (let i = 0; i < item.matchIndexList.length; i++) {
+            itemArray[item.matchIndexList[i]] = `<span class="matchKey">${itemArray[item.matchIndexList[i]]}</span>`
+          }
+          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}"><div class="hint-area-item-icon"></div>${itemArray.join('')}</div>`
+        }))
       this.hint.hintAreaDom.innerHTML = innerHtml.join('')
       // 记录到变量中
       this.hint.selectedDom = this.hint.hintAreaDom.querySelector('.selected')
