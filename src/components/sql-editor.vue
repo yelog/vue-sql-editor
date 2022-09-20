@@ -29,8 +29,6 @@ export default {
         'where', 'like', 'between', 'and', 'in', 'not', 'is', 'null',
         'group', 'on', 'having',
         'order', 'by', 'desc', 'asc'],
-      // 前后可以有其它字符
-      operator: [',', '=', '!=', '\\(', '\\)', '<', '>', ';', '\\*'],
       tables: [
         { name: 'sys_user', column: ['username', 'password', 'type'] },
         { name: 'sys_role', column: ['username', 'password', 'type'] }
@@ -55,6 +53,16 @@ export default {
   computed: {
     tableNames() {
       return this.tables.map(table => table.name)
+    },
+    renderItemList() {
+      return [
+        { className: 'comment', immediate: true, regex: /(--[\s\S]*?)(?=$|\n)/gi },
+        { className: 'string', regex: /('[\s\S]*?')/gi },
+        { className: 'operate', regex: new RegExp('(' + [',', '=', '!=', '\\(', '\\)', '<', '>', ';', '\\*'].join('|') + ')', 'gi') },
+        { className: 'number', regex: /(?<=^|\W)(\d+?)(?=$|\W)/g },
+        { className: 'keyword', regex: new RegExp(`(?<=^|\\W)(${this.keywords.join('|')})(?=$|\\W)`, 'gi') },
+        { className: 'table-name', regex: new RegExp('(?<=(from|join|update|into)\\W+)(\\w+)|(\\w+\\.)', 'gi') }
+      ]
     }
   },
   watch: {
@@ -175,48 +183,49 @@ export default {
       }
       this.hint.hintAreaDom = null
     },
-    replaceByPlaceholder(text, placeholderList, reg, className) {
+    replaceByPlaceholder(text, placeholderList, reg, className, immediate) {
       let result = ''
+      const curPlaceholderList = []
       while ((result = reg.exec(text)) !== null) {
-        placeholderList.push({
+        curPlaceholderList.push({
           index: result.index,
           content: result[0],
-          className: className
+          className: className,
+          immediate: immediate
         })
       }
+      placeholderList.push(...curPlaceholderList)
+      if (immediate) {
+        const sortedPlaceholderList = curPlaceholderList.sort((p1, p2) => p2.index - p1.index)
+        for (let i = 0; i < sortedPlaceholderList.length; i++) {
+          text = text.slice(0, sortedPlaceholderList[i].index) + Array.from({ length: sortedPlaceholderList[i].content.length }, () => ' ').join('') + text.slice(sortedPlaceholderList[i].index + sortedPlaceholderList[i].content.length)
+        }
+      }
+      return text
     },
     renderContent(text) {
       const placeholderList = []
-      // 替换 '' 字符串
-      this.replaceByPlaceholder(text, placeholderList, /('[\s\S]*?')/ig, 'string')
-      // 替换操作符
-      this.replaceByPlaceholder(text, placeholderList, new RegExp('(' + this.operator.join('|') + ')', 'gi'), 'operate')
-      // 替换数字
-      this.replaceByPlaceholder(text, placeholderList, /(?<=^|\W)(\d+?)(?=$|\W)/g, 'number')
-      // 表名
-      this.replaceByPlaceholder(text, placeholderList, new RegExp('(?<=(from|join|update|into) +)(\\w+)|(\\w+)(?=\\.)', 'gi'), 'table-name')
-      // 列名
-      // this.replaceByPlaceholder(text, placeholderList, new RegExp('(?<=(from|join|update|into) +)(\\w+)|(\\w+)(?=\\.)', 'gi'), 'table-name')
-
-      // 倒序处理， 防止先替换前面的数据， 导致后面的数据替换时， 下标错乱的情况
-      const sortedPlaceholderList = placeholderList.sort((p1, p2) => p2.index - p1.index)
-      for (let i = 0; i < sortedPlaceholderList.length; i++) {
-        text = text.slice(0, sortedPlaceholderList[i].index) + ' ' + text.slice(sortedPlaceholderList[i].index + sortedPlaceholderList[i].content.length)
-      }
-      // 表字段
-      // sql 关键字
-      this.keywords.forEach(item => {
-        text = text.replaceAll(new RegExp(`(?<=^|\\W)(${item})(?=$|\\W)`, 'gi'), `<span class="keyword">$1</span>`)
+      this.renderItemList.forEach(item => {
+        text = this.replaceByPlaceholder(text, placeholderList, item.regex, item.className, item.immediate)
       })
-      // 注释
-      text = text.replaceAll(/(--[\s\S]*?)(?=$|\n)/g, `<span class="comment">$1</span>`)
+      // 没有立即处理的， 倒序处理， 防止先替换前面的数据， 导致后面的数据替换时， 下标错乱的情况
+      const sortedPlaceholderList = placeholderList.filter(item => !item.immediate).sort((p1, p2) => p2.index - p1.index)
+      for (let i = 0; i < sortedPlaceholderList.length; i++) {
+        text = text.slice(0, sortedPlaceholderList[i].index) + Array.from({ length: sortedPlaceholderList[i].content.length }, () => ' ').join('') + text.slice(sortedPlaceholderList[i].index + sortedPlaceholderList[i].content.length)
+      }
 
       // 还原替换符
       const breaks = text.split('')
       const tagStack = []
       const tag = []
       let originIndex = 0
+      let placeholderCount = 0
       for (let i = 0; i < breaks.length; i++) {
+        if (placeholderCount > 0) {
+          placeholderCount--
+          breaks[i] = ''
+          continue
+        }
         if (breaks[i] === '<' || tag.length > 0) {
           tag.push(breaks[i])
         }
@@ -236,6 +245,7 @@ export default {
           if (queryResult.length > 0) {
             originIndex += queryResult[0].content.length - 1
             breaks[i] = `<span class="${queryResult[0].className}">${queryResult[0].content}</span>`
+            placeholderCount = queryResult[0].content.length - 1
           }
         }
       }
@@ -455,6 +465,9 @@ export default {
       }
       .table-name {
         color: crimson;
+      }
+      .column {
+        color: lime;
       }
     }
   }
