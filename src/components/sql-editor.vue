@@ -54,6 +54,19 @@ export default {
     tableNames() {
       return this.tables.map(table => table.name)
     },
+    tableColumns() {
+      const columns = []
+      for (let i = 0; i < this.tables.length; i++) {
+        for (let j = 0; j < this.tables[i].column.length; j++) {
+          // columns.push(this.tables[i].column[j] + `(${this.tables[i].name})`)
+          columns.push({
+            value: this.tables[i].column[j],
+            leftPrompt: `(${this.tables[i].name})`
+          })
+        }
+      }
+      return columns
+    },
     renderItemList() {
       return [
         { className: 'comment', immediate: true, regex: /(--[\s\S]*?)(?=$|\n)/gi },
@@ -88,10 +101,11 @@ export default {
   methods: {
     generateMatchList(list, icon = '') {
       return list
-        .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item)).map((item) => {
+        .map(item => typeof item === 'string' ? { value: item } : item)
+        .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item.value)).map((item) => {
           // 所有第一个匹配的char
           const matchIndexList = []
-          const itemArray = item.split('')
+          const itemArray = item.value.split('')
           let lastIndex = 0
           for (let i = 0; i < this.hint.curWord.length; i++) {
             for (let j = lastIndex; j < itemArray.length; j++) {
@@ -103,9 +117,11 @@ export default {
             }
           }
           return {
-            content: item,
+            value: item.value,
             matchIndexList: matchIndexList,
-            icon: icon
+            icon: icon,
+            leftPrompt: item.leftPrompt,
+            rightPrompt: item.rightPrompt
           }
         })
     },
@@ -124,11 +140,12 @@ export default {
       this.hint.curWord = curWordArray.reverse().join('')
       const matchList = []
       if (this.hint.curWord !== '') {
+        // 匹配sql关键字
         matchList.push(...this.generateMatchList(this.keywords, 'icon-sql'))
         // 匹配表名
         matchList.push(...this.generateMatchList(this.tableNames, 'icon-table'))
-        // matchList.push(...this.tableNames
-        //   .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item)))
+        // 匹配列名
+        matchList.push(...this.generateMatchList(this.tableColumns, 'icon-freezecolumn'))
       }
       if (matchList.length === 0 || (matchList.length === 1 && matchList[0].content === this.hint.curWord)) {
         this.closeHints()
@@ -153,11 +170,11 @@ export default {
       // 排序， 索引数和最小的最靠上
         .sort((item1, item2) => item1.matchIndexList.reduce((prev, cur) => prev + cur, 0) - item2.matchIndexList.reduce((prev, cur) => prev + cur, 0))
         .map((item, index) => {
-          const itemArray = item.content.split('')
+          const itemArray = item.value.split('')
           for (let i = 0; i < item.matchIndexList.length; i++) {
             itemArray[item.matchIndexList[i]] = `<span class="matchKey">${itemArray[item.matchIndexList[i]]}</span>`
           }
-          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}"><div class="hint-area-item-icon iconfont ${item.icon}"></div>${itemArray.join('')}</div>`
+          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}" data-value="${item.value}"><div class="hint-area-item-icon iconfont ${item.icon}"></div><div class="hin-area-item-content">${itemArray.join('')}</div><div class="hint-area-item-prompt"><div>${item.leftPrompt || ''}</div><div>${item.rightPrompt || ''}</div></div></div>`
         }))
       this.hint.hintAreaDom.innerHTML = innerHtml.join('')
       // 记录到变量中
@@ -173,7 +190,7 @@ export default {
         // })
         // 鼠标点击选中
         el.addEventListener('click', (event) => {
-          this.addText(event.target.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
+          this.addText(event.target.dataset.value + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
           this.closeHints()
         })
       })
@@ -190,7 +207,7 @@ export default {
       // 修复仍记录上次lastIndex导致下次查询失败的问题
       regexArray[regexIndex].lastIndex = 0
       while ((result = regexArray[regexIndex].exec(text)) !== null && result[0] !== '') {
-        console.log(className, result)
+        // console.log(className, result)
         if (regexIndex + 1 === regexArray.length) {
           // 当前是最后一个
           curPlaceholderList.push({
@@ -293,7 +310,7 @@ export default {
         if (event.keyCode === 13) {
           // 回车 选中并替换光标前单词
           event.preventDefault()
-          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length
+          this.addText(this.hint.selectedDom.dataset.value + ' ', this.getCaretPos() - this.hint.curWord.length
             , this.hint.curWord.length + (this.text[this.getCaretPos()] === ' ' ? 1 : 0))
           this.closeHints()
         }
@@ -312,7 +329,7 @@ export default {
             }
             theRestWord.push(curChar)
           }
-          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length
+          this.addText(this.hint.selectedDom.dataset.value + ' ', this.getCaretPos() - this.hint.curWord.length
             , this.hint.curWord.length + theRestWord.length)
           this.closeHints()
         }
