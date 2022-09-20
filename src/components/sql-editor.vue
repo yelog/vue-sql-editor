@@ -99,6 +99,7 @@ export default {
           }
         })
     },
+    // 展示提示框
     showHints() {
       const innerHtml = []
       // 获取当前字符串
@@ -123,7 +124,7 @@ export default {
         this.closeHints()
         return
       }
-      // 开始展示
+      // 有需要展示的数据，开始展示
       this.hint.caretPos = this.getCaretPos()
       this.hint.hintAreaDom = document.getElementById('hint-area')
       if (!this.hint.hintAreaDom) {
@@ -154,12 +155,12 @@ export default {
       this.hint.itemDomList = this.hint.hintAreaDom.querySelectorAll('.hint-area-item')
       this.hint.itemDomList.forEach(el => {
         // 鼠标移动高亮
-        el.addEventListener('mouseenter', (event) => {
-          // console.log(hintAreaDom.querySelector('.selected'))
-          this.hint.hintAreaDom.querySelector('.selected').classList.remove('selected')
-          event.target.classList.add('selected')
-          this.hint.selectedDom = event.target
-        })
+        // el.addEventListener('mouseenter', (event) => {
+        //   // console.log(hintAreaDom.querySelector('.selected'))
+        //   this.hint.hintAreaDom.querySelector('.selected').classList.remove('selected')
+        //   event.target.classList.add('selected')
+        //   this.hint.selectedDom = event.target
+        // })
         // 鼠标点击选中
         el.addEventListener('click', (event) => {
           this.addText(event.target.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
@@ -254,9 +255,11 @@ export default {
         this.$nextTick(() => {
           this.showHints()
         })
+      } else {
+        this.closeHints()
       }
     },
-    blurEvent() {
+    blurEvent(event) {
       this.closeHints()
     },
     keydownEvent(event) {
@@ -264,14 +267,23 @@ export default {
       if (this.hint.hintAreaDom) {
         // 有提示框
         if (event.keyCode === 13) {
-          // 回车
+          // 回车 选中并替换光标前单词
           event.preventDefault()
           this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
           this.closeHints()
         }
         if (event.keyCode === 9) {
+          // tab 选中并替换光标所在单词
           event.preventDefault()
-          this.addText('    ')
+          const theRestWord = []
+          for (let i = this.getCaretPos(); i < this.text.length; i++) {
+            const curChar = this.text[i]
+            if (!/\w/g.test(curChar)) {
+              break
+            }
+            theRestWord.push(curChar)
+          }
+          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length + theRestWord.length)
           this.closeHints()
         }
         if (event.keyCode === 40 || event.keyCode === 38) {
