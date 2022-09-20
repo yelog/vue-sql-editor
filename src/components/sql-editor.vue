@@ -289,6 +289,11 @@ export default {
           this.hint.itemDomList[nextIndex].classList.add('selected')
           this.hint.selectedDom = this.hint.itemDomList[nextIndex]
         }
+        // esc 关闭提示框
+        if (event.keyCode === 27) {
+          event.preventDefault()
+          this.closeHints()
+        }
       } else {
         if (event.keyCode === 9) {
           // 禁用 tab 默认行为
