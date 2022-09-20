@@ -269,7 +269,8 @@ export default {
         if (event.keyCode === 13) {
           // 回车 选中并替换光标前单词
           event.preventDefault()
-          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
+          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length
+            , this.hint.curWord.length + (this.text[this.getCaretPos()] === ' ' ? 1 : 0))
           this.closeHints()
         }
         if (event.keyCode === 9) {
@@ -279,11 +280,16 @@ export default {
           for (let i = this.getCaretPos(); i < this.text.length; i++) {
             const curChar = this.text[i]
             if (!/\w/g.test(curChar)) {
+              // 如果后面有空格就重写这个空格
+              if (curChar === ' ') {
+                theRestWord.push(curChar)
+              }
               break
             }
             theRestWord.push(curChar)
           }
-          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length + theRestWord.length)
+          this.addText(this.hint.selectedDom.innerText + ' ', this.getCaretPos() - this.hint.curWord.length
+            , this.hint.curWord.length + theRestWord.length)
           this.closeHints()
         }
         if (event.keyCode === 40 || event.keyCode === 38) {
