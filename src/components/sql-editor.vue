@@ -25,12 +25,16 @@ export default {
       keywords: ['create', 'drop', 'alter', 'table', 'column', 'use', 'database',
         'int', 'integer', 'varchar',
         'select', 'delete', 'update', 'set', 'insert', 'into', 'values',
-        'min', 'max', 'as', 'from',
+        'min', 'max', 'as', 'from', 'left', 'join', 'outer',
         'where', 'like', 'between', 'and', 'in', 'not', 'is', 'null',
         'group', 'on', 'having',
         'order', 'by', 'desc', 'asc'],
       // 前后可以有其它字符
-      operator: [',', '=', '!=', '\\(', '\\)', '<', '>', ';'],
+      operator: [',', '=', '!=', '\\(', '\\)', '<', '>', ';', '\\*'],
+      tables: [
+        { name: 'sys_user', column: ['username', 'password', 'type'] },
+        { name: 'sys_role', column: ['username', 'password', 'type'] }
+      ],
       redo: {
         historyList: [],
         redoList: [],
@@ -46,6 +50,11 @@ export default {
       isInput: false,
       text: '',
       html: ''
+    }
+  },
+  computed: {
+    tableNames() {
+      return this.tables.map(table => table.name)
     }
   },
   watch: {
@@ -97,7 +106,7 @@ export default {
       }
       // 设置位置信息
       const pos = getCursorPos.getInputPositon(this.$refs.editTextarea, this.getCaretPos() - curWordArray.length)
-      console.log(pos)
+      // console.log(pos)
       this.hint.hintAreaDom.style.top = (pos.top + 20) + 'px'
       this.hint.hintAreaDom.style.left = (pos.left - 18) + 'px'
       // 设置列表
@@ -129,26 +138,32 @@ export default {
       }
       this.hint.hintAreaDom = null
     },
-    renderContent(text) {
-      // 替换 '' 字符串
-      const placeholderList = []
-      const reg = /('[\s\S]*?')/ig
+    replaceByPlaceholder(text, placeholderList, reg, className) {
       let result = ''
       while ((result = reg.exec(text)) !== null) {
         placeholderList.push({
           index: result.index,
-          content: result[0]
+          content: result[0],
+          className: className
         })
       }
+    },
+    renderContent(text) {
+      const placeholderList = []
+      // 替换 '' 字符串
+      this.replaceByPlaceholder(text, placeholderList, /('[\s\S]*?')/ig, 'string')
+      // 替换操作符
+      this.replaceByPlaceholder(text, placeholderList, new RegExp('(' + this.operator.join('|') + ')', 'gi'), 'operate')
+      // 替换数字
+      this.replaceByPlaceholder(text, placeholderList, /(?<=^|\W)(\d+?)(?=$|\W)/g, 'number')
+      // 表名
+      this.replaceByPlaceholder(text, placeholderList, new RegExp('(?<=(from|join|update|into) +)(\\w+)|(\\w+)(?=\\.)', 'gi'), 'table-name')
+      // 列名
+      // this.replaceByPlaceholder(text, placeholderList, new RegExp('(?<=(from|join|update|into) +)(\\w+)|(\\w+)(?=\\.)', 'gi'), 'table-name')
       for (let i = 0; i < placeholderList.length; i++) {
         text = text.replace(placeholderList[i].content, ' ')
       }
-      // 拆分 <>， 防止被页面解析, 和渲染操作符合并， 防止渲染出现的 = 被操作符识别
-      // text = text.replaceAll(/([<>])/g, `<span class="symbol">$1</span>`)
-      // 渲染操作符
-      text = text.replaceAll(new RegExp('(' + this.operator.join('|') + ')', 'gi'), `<span class="operate">$1</span>`)
-      // 渲染数字
-      text = text.replaceAll(/(?<=^|\W)(\d+?)(?=$|\W)/g, `<span class="number">$1</span>`)
+      // 表字段
       // sql 关键字
       this.keywords.forEach(item => {
         text = text.replaceAll(new RegExp(`(?<=^|\\W)(${item})(?=$|\\W)`, 'gi'), `<span class="keyword">$1</span>`)
@@ -177,11 +192,11 @@ export default {
         }
         if (!(breaks[i] === '<' || tag.length > 0 || breaks[i] === '>')) {
           originIndex++
-        }
-        const queryResult = placeholderList.filter(placeholder => (placeholder.index + 1) === originIndex)
-        if (queryResult.length > 0) {
-          originIndex += queryResult[0].content.length - 1
-          breaks[i] = `<span class="string">${queryResult[0].content}</span>`
+          const queryResult = placeholderList.filter(placeholder => (placeholder.index + 1) === originIndex)
+          if (queryResult.length > 0) {
+            originIndex += queryResult[0].content.length - 1
+            breaks[i] = `<span class="${queryResult[0].className}">${queryResult[0].content}</span>`
+          }
         }
       }
       this.html = breaks.join('')
@@ -375,6 +390,9 @@ export default {
       }
       .symbol {
         color: #778899;
+      }
+      .table-name {
+        color: crimson;
       }
     }
   }
