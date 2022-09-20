@@ -57,11 +57,12 @@ export default {
     renderItemList() {
       return [
         { className: 'comment', immediate: true, regex: /(--[\s\S]*?)(?=$|\n)/gi },
-        { className: 'string', regex: /('[\s\S]*?')/gi },
-        { className: 'operate', regex: new RegExp('(' + [',', '=', '!=', '\\(', '\\)', '<', '>', ';', '\\*'].join('|') + ')', 'gi') },
+        { className: 'string', immediate: true, regex: /('[\s\S]*?')/gi },
+        { className: 'operate', immediate: true, regex: new RegExp('(' + [',', '=', '!=', '\\(', '\\)', '<', '>', ';', '\\*'].join('|') + ')', 'gi') },
         { className: 'number', regex: /(?<=^|\W)(\d+?)(?=$|\W)/g },
         { className: 'keyword', regex: new RegExp(`(?<=^|\\W)(${this.keywords.join('|')})(?=$|\\W)`, 'gi') },
-        { className: 'table-name', regex: new RegExp('(?<=(from|join|update|into)\\W+)(\\w+)|(\\w+\\.)', 'gi') }
+        { className: 'table-name', regex: new RegExp(`(?<=(from|join|update|into)\\W+)(${this.tableNames.join('|')})|(${this.tableNames.join('|')}\\.)`, 'gi') },
+        { className: 'column', regex: [/((?<=select\W+)[\s\S]*?(?=$|\W+from))|((?<=\W+on\W+)[\s\S]*?(?=$|\W+where))|((?<=\W+where\W+)[\s\S]*?(?=$|\)))/g, /(\w+)(?!\.|\w)/g] }
       ]
     }
   },
@@ -82,7 +83,7 @@ export default {
     }
   },
   mounted() {
-    this.text = 'select * from sys_user'
+    this.text = 'select\n    username, password, sys_user.type as user_type\nfrom\n    sys_user user\n    left join sys_role role on user.role_id = role.id\nwhere username=\'yang\'\n    and sys_user.type in (\'web\')\n    and age between 18 and 30 and role.id < 5'
   },
   methods: {
     generateMatchList(list) {
@@ -183,17 +184,28 @@ export default {
       }
       this.hint.hintAreaDom = null
     },
-    replaceByPlaceholder(text, placeholderList, reg, className, immediate) {
+    handleRegex(text, startIndex, curPlaceholderList, regexArray, regexIndex, className, immediate) {
       let result = ''
-      const curPlaceholderList = []
-      while ((result = reg.exec(text)) !== null) {
-        curPlaceholderList.push({
-          index: result.index,
-          content: result[0],
-          className: className,
-          immediate: immediate
-        })
+      // 修复仍记录上次lastIndex导致下次查询失败的问题
+      regexArray[regexIndex].lastIndex = 0
+      while ((result = regexArray[regexIndex].exec(text)) !== null && result[0] !== '') {
+        console.log(className, result)
+        if (regexIndex + 1 === regexArray.length) {
+          // 当前是最后一个
+          curPlaceholderList.push({
+            index: startIndex + result.index,
+            content: result[0],
+            className: className,
+            immediate: immediate
+          })
+        } else {
+          this.handleRegex(result[0], startIndex + result.index, curPlaceholderList, regexArray, regexIndex + 1, className, immediate)
+        }
       }
+    },
+    replaceByPlaceholder(text, placeholderList, regex, className, immediate) {
+      const curPlaceholderList = []
+      this.handleRegex(text, 0, curPlaceholderList, Array.isArray(regex) ? regex : [regex], 0, className, immediate)
       placeholderList.push(...curPlaceholderList)
       if (immediate) {
         const sortedPlaceholderList = curPlaceholderList.sort((p1, p2) => p2.index - p1.index)
@@ -213,6 +225,7 @@ export default {
       for (let i = 0; i < sortedPlaceholderList.length; i++) {
         text = text.slice(0, sortedPlaceholderList[i].index) + Array.from({ length: sortedPlaceholderList[i].content.length }, () => ' ').join('') + text.slice(sortedPlaceholderList[i].index + sortedPlaceholderList[i].content.length)
       }
+      // ((?<=select\W+)((\w+)\W*)+?(?=\W*from))|(?<=set\W+)(\w+\W*)+(?=where)|(?<=where\W+)(\w+\W*)+?
 
       // 还原替换符
       const breaks = text.split('')
@@ -424,7 +437,7 @@ export default {
     background: none;
     border: none;
     resize: none;
-    caret-color: #2795EE;
+    caret-color: #000000;
     color: transparent;
     background: transparent;
   }
@@ -435,7 +448,7 @@ export default {
   }
   &-code {
     display: block;
-    color: #2795EE;
+    color: #000000;
     width: 100%;
     height: 100%;
     font-family: inherit;
@@ -467,7 +480,7 @@ export default {
         color: crimson;
       }
       .column {
-        color: lime;
+        color: #2795EE;
       }
     }
   }
