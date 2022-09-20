@@ -160,8 +160,11 @@ export default {
       this.replaceByPlaceholder(text, placeholderList, new RegExp('(?<=(from|join|update|into) +)(\\w+)|(\\w+)(?=\\.)', 'gi'), 'table-name')
       // 列名
       // this.replaceByPlaceholder(text, placeholderList, new RegExp('(?<=(from|join|update|into) +)(\\w+)|(\\w+)(?=\\.)', 'gi'), 'table-name')
-      for (let i = 0; i < placeholderList.length; i++) {
-        text = text.replace(placeholderList[i].content, ' ')
+
+      // 倒序处理， 防止先替换前面的数据， 导致后面的数据替换时， 下标错乱的情况
+      const sortedPlaceholderList = placeholderList.sort((p1, p2) => p2.index - p1.index)
+      for (let i = 0; i < sortedPlaceholderList.length; i++) {
+        text = text.slice(0, sortedPlaceholderList[i].index) + ' ' + text.slice(sortedPlaceholderList[i].index + sortedPlaceholderList[i].content.length)
       }
       // 表字段
       // sql 关键字
