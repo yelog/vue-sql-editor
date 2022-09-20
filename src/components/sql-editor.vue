@@ -43,6 +43,20 @@ export default {
         caretPos: 0,
         curWord: '',
         selectedDom: '',
+        typeMap: {
+          'sql': {
+            icon: 'icon-sql',
+            suffix: ' '
+          },
+          'table': {
+            icon: 'icon-table',
+            suffix: ''
+          },
+          'column': {
+            icon: 'icon-freezecolumn',
+            suffix: ''
+          }
+        },
         itemDomList: []
       },
       isInput: false,
@@ -99,7 +113,7 @@ export default {
     this.text = 'select\n    username, password, sys_user.type as user_type\nfrom\n    sys_user user\n    left join sys_role role on user.role_id = role.id\nwhere username=\'yang\'\n    and sys_user.type in (\'web\')\n    and age between 18 and 30 and role.id < 5'
   },
   methods: {
-    generateMatchList(list, icon = '') {
+    generateMatchList(list, type = 'sql') {
       return list
         .map(item => typeof item === 'string' ? { value: item } : item)
         .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item.value)).map((item) => {
@@ -118,8 +132,9 @@ export default {
           }
           return {
             value: item.value,
+            suffix: this.hint.typeMap[type].suffix,
             matchIndexList: matchIndexList,
-            icon: icon,
+            icon: this.hint.typeMap[type].icon,
             leftPrompt: item.leftPrompt,
             rightPrompt: item.rightPrompt
           }
@@ -141,11 +156,11 @@ export default {
       const matchList = []
       if (this.hint.curWord !== '') {
         // 匹配sql关键字
-        matchList.push(...this.generateMatchList(this.keywords, 'icon-sql'))
+        matchList.push(...this.generateMatchList(this.keywords, 'sql'))
         // 匹配表名
-        matchList.push(...this.generateMatchList(this.tableNames, 'icon-table'))
+        matchList.push(...this.generateMatchList(this.tableNames, 'table'))
         // 匹配列名
-        matchList.push(...this.generateMatchList(this.tableColumns, 'icon-freezecolumn'))
+        matchList.push(...this.generateMatchList(this.tableColumns, 'column'))
       }
       if (matchList.length === 0 || (matchList.length === 1 && matchList[0].content === this.hint.curWord)) {
         this.closeHints()
@@ -174,7 +189,7 @@ export default {
           for (let i = 0; i < item.matchIndexList.length; i++) {
             itemArray[item.matchIndexList[i]] = `<span class="matchKey">${itemArray[item.matchIndexList[i]]}</span>`
           }
-          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}" data-value="${item.value}"><div class="hint-area-item-icon iconfont ${item.icon}"></div><div class="hin-area-item-content">${itemArray.join('')}</div><div class="hint-area-item-prompt"><div>${item.leftPrompt || ''}</div><div>${item.rightPrompt || ''}</div></div></div>`
+          return `<div class="hint-area-item ${index === 0 ? 'selected' : ''}" data-value="${item.value + item.suffix}"><div class="hint-area-item-icon iconfont ${item.icon}"></div><div class="hin-area-item-content">${itemArray.join('')}</div><div class="hint-area-item-prompt"><div>${item.leftPrompt || ''}</div><div>${item.rightPrompt || ''}</div></div></div>`
         }))
       this.hint.hintAreaDom.innerHTML = innerHtml.join('')
       // 记录到变量中
@@ -190,7 +205,7 @@ export default {
         // })
         // 鼠标点击选中
         el.addEventListener('click', (event) => {
-          this.addText(event.target.dataset.value + ' ', this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
+          this.addText(event.target.dataset.value, this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
           this.closeHints()
         })
       })
@@ -310,8 +325,8 @@ export default {
         if (event.keyCode === 13) {
           // 回车 选中并替换光标前单词
           event.preventDefault()
-          this.addText(this.hint.selectedDom.dataset.value + ' ', this.getCaretPos() - this.hint.curWord.length
-            , this.hint.curWord.length + (this.text[this.getCaretPos()] === ' ' ? 1 : 0))
+          this.addText(this.hint.selectedDom.dataset.value, this.getCaretPos() - this.hint.curWord.length
+            , this.hint.curWord.length + (this.text[this.getCaretPos()] === ' ' && this.hint.selectedDom.dataset.value.endsWith(' ') ? 1 : 0))
           this.closeHints()
         }
         if (event.keyCode === 9) {
@@ -322,14 +337,14 @@ export default {
             const curChar = this.text[i]
             if (!/\w/g.test(curChar)) {
               // 如果后面有空格就重写这个空格
-              if (curChar === ' ') {
+              if (curChar === ' ' && this.hint.selectedDom.dataset.value.endsWith(' ')) {
                 theRestWord.push(curChar)
               }
               break
             }
             theRestWord.push(curChar)
           }
-          this.addText(this.hint.selectedDom.dataset.value + ' ', this.getCaretPos() - this.hint.curWord.length
+          this.addText(this.hint.selectedDom.dataset.value, this.getCaretPos() - this.hint.curWord.length
             , this.hint.curWord.length + theRestWord.length)
           this.closeHints()
         }
