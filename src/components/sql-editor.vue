@@ -215,8 +215,9 @@ export default {
       // 设置位置信息
       const pos = getCursorPos.getInputPositon(this.$refs.editTextarea, this.getCaretPos() - curWordArray.length)
       // console.log(pos)
+      const leftPos = pos.left - 23
       this.hint.hintAreaDom.style.top = (pos.top + 20) + 'px'
-      this.hint.hintAreaDom.style.left = (pos.left - 23) + 'px'
+      this.hint.hintAreaDom.style.left = (leftPos < 0 ? 0 : leftPos) + 'px'
       // 设置列表
       innerHtml.push(...matchList
       // 排序， 索引数和最小的最靠上
