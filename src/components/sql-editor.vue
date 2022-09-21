@@ -113,10 +113,10 @@ export default {
     this.text = 'select\n    username, password, sys_user.type as user_type\nfrom\n    sys_user user\n    left join sys_role role on user.role_id = role.id\nwhere username=\'yang\'\n    and sys_user.type in (\'web\')\n    and age between 18 and 30 and role.id < 5'
   },
   methods: {
-    generateMatchList(list, type = 'sql') {
+    generateMatchList(list, type = 'sql', allowSearchNull) {
       return list
         .map(item => typeof item === 'string' ? { value: item } : item)
-        .filter(item => new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item.value)).map((item) => {
+        .filter(item => allowSearchNull ? true : new RegExp(this.hint.curWord.split('').join('\\w*'), 'gi').test(item.value)).map((item) => {
           // 所有第一个匹配的char
           const matchIndexList = []
           const itemArray = item.value.split('')
@@ -145,24 +145,61 @@ export default {
       const innerHtml = []
       // 获取当前字符串
       const curWordArray = []
+      // 关键key，用于区分提示行为， 比如.
+      let theKey = ''
       for (let i = this.getCaretPos() - 1; i >= 0; i--) {
         const curChar = this.text[i]
         if (!/\w/g.test(curChar)) {
+          theKey = curChar
           break
         }
         curWordArray.push(curChar)
       }
       this.hint.curWord = curWordArray.reverse().join('')
       const matchList = []
-      if (this.hint.curWord !== '') {
-        // 匹配sql关键字
-        matchList.push(...this.generateMatchList(this.keywords, 'sql'))
-        // 匹配表名
-        matchList.push(...this.generateMatchList(this.tableNames, 'table'))
-        // 匹配列名
-        matchList.push(...this.generateMatchList(this.tableColumns, 'column'))
+      if (theKey === '.') {
+        // 获取表名
+        const tableNameArray = []
+        for (let i = this.getCaretPos() - 1 - this.hint.curWord.length - 1; i >= 0; i--) {
+          const curChar = this.text[i]
+          if (!/\w/g.test(curChar)) {
+            break
+          }
+          tableNameArray.push(curChar)
+        }
+        const tableName = tableNameArray.reverse().join('')
+        const tableFilter = this.tables.filter(item => item.name === tableName)
+        let columns = []
+        if (tableFilter.length > 0) {
+          columns = tableFilter[0].column
+        } else {
+          // 通过别名获取表名
+          let result
+          const reg = new RegExp(`[ \\n]\\w+[ \\n]+${tableName}(?=[ \\n])`, 'gi')
+          while ((result = reg.exec(this.text)) && result[0] !== '') {
+            const aliasTableFilter = this.tables.filter(item => item.name === result[0].trim().split(/ |\n/g)[0])
+            if (aliasTableFilter.length > 0) {
+              columns = aliasTableFilter[0].column
+              break
+            }
+          }
+        }
+
+        if (columns.length > 0) {
+          matchList.push(...this.generateMatchList(columns, 'column', true))
+        }
+      } else {
+        if (this.hint.curWord !== '') {
+          // 匹配sql关键字
+          matchList.push(...this.generateMatchList(this.keywords, 'sql'))
+          // 匹配表名
+          matchList.push(...this.generateMatchList(this.tableNames, 'table'))
+          // 匹配列名
+          matchList.push(...this.generateMatchList(this.tableColumns, 'column'))
+        }
       }
-      if (matchList.length === 0 || (matchList.length === 1 && matchList[0].content === this.hint.curWord)) {
+
+      if (matchList.length === 0 || (matchList.length === 1 && matchList[0].value === this.hint.curWord)) {
         this.closeHints()
         return
       }
@@ -183,7 +220,7 @@ export default {
       // 设置列表
       innerHtml.push(...matchList
       // 排序， 索引数和最小的最靠上
-        .sort((item1, item2) => item1.matchIndexList.reduce((prev, cur) => prev + cur, 0) - item2.matchIndexList.reduce((prev, cur) => prev + cur, 0))
+        .sort((item1, item2) => item2.matchIndexList.length - item1.matchIndexList.length || item1.matchIndexList.reduce((prev, cur) => prev + cur, 0) - item2.matchIndexList.reduce((prev, cur) => prev + cur, 0))
         .map((item, index) => {
           const itemArray = item.value.split('')
           for (let i = 0; i < item.matchIndexList.length; i++) {
@@ -307,7 +344,7 @@ export default {
       }
     }),
     inputEvent(event) {
-      if (/\w/g.test(event.data)) {
+      if (/\w|\./g.test(event.data)) {
         this.$nextTick(() => {
           this.showHints()
         })
