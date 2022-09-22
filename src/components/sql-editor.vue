@@ -4,13 +4,14 @@
       ref="editTextarea"
       v-model="text"
       class="sql-editor-textarea"
+      wrap="off"
       @input="inputEvent"
       @blur="blurEvent"
       @keydown="keydownEvent"
       @click="clickEvent"
       @keyup="keyupEvent"
     />
-    <pre class="sql-editor-pre"><code class="sql-editor-code" v-html="html" /> </pre>
+    <pre ref="editPre" class="sql-editor-pre"><code class="sql-editor-code" v-html="html" /> </pre>
   </div>
 </template>
 <script>
@@ -105,6 +106,14 @@ export default {
         this.storeHistory()
         // console.log('watch', newValue)
         this.renderContent(newValue)
+        // 适应宽度
+        this.$nextTick(() => {
+          this.$refs.editTextarea.style.width = ''
+          const innerWidth = this.$refs.editTextarea.scrollWidth + 'px'
+          this.$refs.editTextarea.style.width = innerWidth
+          this.$refs.editPre.style.width = innerWidth
+          // console.log('innerWidth', innerWidth)
+        })
       },
       immediate: true
     }
@@ -238,12 +247,12 @@ export default {
         // el.addEventListener('mouseenter', (event) => {
         //   // console.log(hintAreaDom.querySelector('.selected'))
         //   this.hint.hintAreaDom.querySelector('.selected').classList.remove('selected')
-        //   event.target.classList.add('selected')
-        //   this.hint.selectedDom = event.target
+        //   event.currentTarget.classList.add('selected')
+        //   this.hint.selectedDom = event.currentTarget
         // })
         // 鼠标点击选中
         el.addEventListener('click', (event) => {
-          this.addText(event.target.dataset.value, this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
+          this.addText(event.currentTarget.dataset.value, this.getCaretPos() - this.hint.curWord.length, this.hint.curWord.length)
           this.closeHints()
         })
       })
@@ -345,6 +354,8 @@ export default {
       }
     }),
     inputEvent(event) {
+      // console.log(event.currentTarget.value.substring(0, this.getCaretPos()))
+      // console.log(this.text.substring(0, this.getCaretPos()))
       if (/\w|\./g.test(event.data)) {
         this.$nextTick(() => {
           this.showHints()
@@ -354,7 +365,10 @@ export default {
       }
     },
     blurEvent(event) {
-      this.closeHints()
+      // 异步， 提示框上的点击事件失效
+      setTimeout(() => {
+        this.closeHints()
+      }, 100)
     },
     keydownEvent(event) {
       // console.log(event)
@@ -483,10 +497,15 @@ export default {
   font-size: 15px;
   line-height: 1.1;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  width: 100%;
-  height: inherit;
+  //width: 100%;
+  //height: inherit;
+  overflow: auto;
+  width: 300px;
+  height: 300px;
+  border: 1px solid #dcdfe6;
+  box-sizing: border-box;
 
-  &-pre, &-textarea {
+  &-pre, &-textarea, &-calc-width {
     width: 100%;
     height: 100%;
     padding: 10px;
@@ -511,10 +530,12 @@ export default {
     caret-color: #000000;
     color: transparent;
     background: transparent;
+    overflow: hidden;
   }
   &-pre {
     z-index: 3;
     pointer-events: none;
+    overflow: hidden;
     //top: 200px;
   }
   &-code {
@@ -523,7 +544,7 @@ export default {
     width: 100%;
     height: 100%;
     font-family: inherit;
-    overflow: hidden;
+    //overflow: hidden;
 
     /deep/{
       .keyword {

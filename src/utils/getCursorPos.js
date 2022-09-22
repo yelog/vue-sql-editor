@@ -120,7 +120,7 @@ export const getCursorPos = {
         Sel.moveStart('character', -elem.value.length)
         index = Sel.text.length
       }
-    } else if (elem.selectionStart || elem.selectionStart == '0') { // Firefox support
+    } else if (elem.selectionStart || elem.selectionStart === 0) { // Firefox support
       index = elem.selectionStart
     }
     return (index)
