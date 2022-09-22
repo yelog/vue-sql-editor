@@ -20,6 +20,12 @@ import { getCursorPos } from '@/utils/getCursorPos'
 
 export default {
   name: 'SqlEditor',
+  props: {
+    value: {
+      type: String,
+      default: ''
+    }
+  },
   data() {
     return {
       // 前后不能有其它字符
@@ -95,31 +101,31 @@ export default {
     }
   },
   watch: {
-    text: {
-      handler(newValue) {
-        if (this.redo.isRedo) {
-          // 撤销/重做操作
-          this.redo.isRedo = false
-        } else {
-          this.redo.redoList = []
-        }
-        this.storeHistory()
-        // console.log('watch', newValue)
-        this.renderContent(newValue)
-        // 适应宽度
-        this.$nextTick(() => {
-          this.$refs.editTextarea.style.width = ''
-          const innerWidth = this.$refs.editTextarea.scrollWidth + 'px'
-          this.$refs.editTextarea.style.width = innerWidth
-          this.$refs.editPre.style.width = innerWidth
-          // console.log('innerWidth', innerWidth)
-        })
-      },
-      immediate: true
+    value(val) {
+      this.text = val
+    },
+    text(newValue) {
+      if (this.redo.isRedo) {
+        // 撤销/重做操作
+        this.redo.isRedo = false
+      } else {
+        this.redo.redoList = []
+      }
+      this.storeHistory()
+      // console.log('watch', newValue)
+      this.renderContent(newValue)
+      // 适应宽度
+      this.$nextTick(() => {
+        this.$refs.editTextarea.style.width = ''
+        const innerWidth = this.$refs.editTextarea.scrollWidth + 'px'
+        this.$refs.editTextarea.style.width = innerWidth
+        this.$refs.editPre.style.width = innerWidth
+        // console.log('innerWidth', innerWidth)
+      })
+      this.$emit('input', newValue)
     }
   },
   mounted() {
-    this.text = 'select\n    username, password, sys_user.type as user_type\nfrom\n    sys_user user\n    left join sys_role role on user.role_id = role.id\nwhere username=\'yang\'\n    and sys_user.type in (\'web\')\n    and age between 18 and 30 and role.id < 5'
   },
   methods: {
     generateMatchList(list, type = 'sql', allowSearchNull) {
